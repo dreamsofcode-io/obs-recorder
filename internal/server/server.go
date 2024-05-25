@@ -21,6 +21,10 @@ type validationError struct {
 	Reason string `json:"reason"`
 }
 
+type UpdateBody struct {
+	Filename string `json:"filename"`
+}
+
 func Start(ctx context.Context) error {
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
 
@@ -80,10 +84,6 @@ func Start(ctx context.Context) error {
 	})
 
 	router.HandleFunc("PUT /recordings/{id}", func(w http.ResponseWriter, r *http.Request) {
-		type updateBody struct {
-			Filename string `json:"filename"`
-		}
-
 		id, err := uuid.Parse(r.PathValue("id"))
 		if err != nil {
 			json.NewEncoder(w).Encode(validationError{
@@ -92,7 +92,7 @@ func Start(ctx context.Context) error {
 			w.WriteHeader(http.StatusBadRequest)
 		}
 
-		var body updateBody
+		var body UpdateBody
 
 		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 			w.WriteHeader(http.StatusBadRequest)
