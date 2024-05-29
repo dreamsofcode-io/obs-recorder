@@ -14,7 +14,6 @@ import (
 	"github.com/ncruces/zenity"
 	"github.com/spf13/cobra"
 
-	"github.com/dreamsofcode-io/obs-remote/internal/recording"
 	"github.com/dreamsofcode-io/obs-remote/internal/server"
 )
 
@@ -47,26 +46,30 @@ var stopCmd = &cobra.Command{
 			return errors.New("request failed")
 		}
 
-		rec := recording.Recording{}
+		body := server.StopResponse{}
 
-		if err := json.NewDecoder(res.Body).Decode(&rec); err != nil {
+		if err := json.NewDecoder(res.Body).Decode(&body); err != nil {
 			log.Println("failed to decode response body", err)
 			return err
 		}
 
-		title, err := zenity.Entry("Enter recording title:", zenity.Title("Name recording"))
+		title, err := zenity.Entry(
+			"Enter recording title:",
+			zenity.Title("Name recording"),
+			zenity.EntryText(fmt.Sprintf("%s-", body.Prefix)),
+		)
 		if errors.Is(err, zenity.ErrCanceled) {
 			// delete the file
 		}
 
-		url := fmt.Sprintf("%s/recordings/%s", baseURL, rec.ID)
-		body := server.UpdateBody{
+		url := fmt.Sprintf("%s/recordings/%s", baseURL, body.Recording.ID)
+		updateBody := server.UpdateBody{
 			Filename: title,
 		}
 
 		bs := &bytes.Buffer{}
 
-		if err = json.NewEncoder(bs).Encode(body); err != nil {
+		if err = json.NewEncoder(bs).Encode(updateBody); err != nil {
 			log.Println("failed to encode the filename request body", err)
 			return err
 		}

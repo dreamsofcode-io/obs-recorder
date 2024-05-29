@@ -4,6 +4,8 @@ Copyright © 2024 NAME HERE <EMAIL ADDRESS>
 package cmd
 
 import (
+	"log"
+
 	"github.com/spf13/cobra"
 
 	"github.com/dreamsofcode-io/obs-remote/internal/server"
@@ -14,7 +16,9 @@ var serverCmd = &cobra.Command{
 	Use:   "server",
 	Short: "Server based top level command",
 	Run: func(cmd *cobra.Command, args []string) {
-		server.Start(cmd.Context())
+		if err := server.Start(cmd.Context()); err != nil {
+			log.Println(err)
+		}
 	},
 }
 

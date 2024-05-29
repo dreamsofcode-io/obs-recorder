@@ -34,7 +34,7 @@ var startCmd = &cobra.Command{
 
 		client := http.Client{}
 		if _, err = client.Do(req); err != nil {
-			log.Println("failed to do request")
+			log.Println("failed to do request", err)
 		}
 
 		return nil

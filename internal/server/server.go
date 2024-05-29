@@ -9,6 +9,8 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"regexp"
+	"strconv"
 
 	"github.com/andreykaipov/goobs"
 	"github.com/google/uuid"
@@ -25,12 +27,18 @@ type UpdateBody struct {
 	Filename string `json:"filename"`
 }
 
+type StopResponse struct {
+	Recording recording.Recording `json:"recording"`
+	Prefix    string              `json:"prefix"`
+}
+
 func Start(ctx context.Context) error {
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
 
 	repo := recording.NewRepository()
 
-	obsClient, err := goobs.New("localhost:4455", goobs.WithPassword("ANPtuxVGio4BpvZp"))
+	password := os.Getenv("OBS_WEBSOCKET_PASSWORD")
+	obsClient, err := goobs.New("localhost:4455", goobs.WithPassword(password))
 	if err != nil {
 		return fmt.Errorf("failed to create client: %w", err)
 	}
@@ -65,7 +73,7 @@ func Start(ctx context.Context) error {
 		}
 
 		if err = repo.Insert(r.Context(), rec); err != nil {
-			slog.Error(
+			logger.Error(
 				"failed to write recording",
 				slog.Any("error", err),
 				slog.String("outputpath", res.OutputPath),
@@ -74,11 +82,16 @@ func Start(ctx context.Context) error {
 			return
 		}
 
-		if err = json.NewEncoder(w).Encode(rec); err != nil {
-			slog.Error(
+		response := StopResponse{
+			Recording: rec,
+			Prefix:    getNextPrefix(logger),
+		}
+
+		if err = json.NewEncoder(w).Encode(response); err != nil {
+			logger.Error(
 				"failed to marshal on json",
 				slog.Any("error", err),
-				slog.Any("recording", rec),
+				slog.Any("response", response),
 			)
 		}
 	})
@@ -145,7 +158,7 @@ func Start(ctx context.Context) error {
 	})
 
 	srv := http.Server{
-		Addr:    ":3000",
+		Addr:    ":2700",
 		Handler: middleware.Logging(logger)(router),
 	}
 
@@ -157,4 +170,45 @@ func Start(ctx context.Context) error {
 	}
 
 	return nil
+}
+
+func getNextPrefix(logger *slog.Logger) string {
+	pattern := "/Users/elliott/Movies/Screencast/*.mov"
+
+	files, err := filepath.Glob(pattern)
+	if err != nil {
+		logger.Error("failed to glob pattern", slog.Any("error", err))
+		return "000"
+	}
+
+	re, err := regexp.Compile(`.*/(?<num>[0-9]{3})-.*\.mov`)
+	if err != nil {
+		logger.Error("failed to compile regex", slog.Any("error", err))
+		return "000"
+	}
+
+	index := re.SubexpIndex("num")
+	maxNum := -1
+
+	for _, file := range files {
+		matches := re.FindStringSubmatch(file)
+		if len(matches) == 0 {
+			continue
+		}
+
+		match := matches[index]
+		fmt.Println("MATCH:", match)
+
+		num, err := strconv.Atoi(match)
+		if err != nil {
+			logger.Warn("failed to parse num", slog.String("match", match), slog.Any("error", err))
+			continue
+		}
+
+		if num > maxNum {
+			maxNum = num
+		}
+	}
+
+	return fmt.Sprintf("%03d", maxNum+1)
 }
