@@ -38,10 +38,6 @@ func Start(ctx context.Context) error {
 	repo := recording.NewRepository()
 
 	password := os.Getenv("OBS_WEBSOCKET_PASSWORD")
-	obsClient, err := goobs.New("localhost:4455", goobs.WithPassword(password))
-	if err != nil {
-		return fmt.Errorf("failed to create client: %w", err)
-	}
 
 	router := http.NewServeMux()
 	router.HandleFunc("GET /{$}", func(_ http.ResponseWriter, _ *http.Request) {
@@ -49,10 +45,32 @@ func Start(ctx context.Context) error {
 	})
 
 	router.HandleFunc("POST /record/start", func(w http.ResponseWriter, r *http.Request) {
-		obsClient.Record.StartRecord()
+		obsClient, err := goobs.New("localhost:4455", goobs.WithPassword(password))
+		if err != nil {
+			slog.Error("failed to connect to obs", slog.Any("error", err))
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+		defer obsClient.Disconnect()
+
+		_, err = obsClient.Record.StartRecord()
+		if err != nil {
+			slog.Error("failed to start recording", slog.Any("error", err))
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
 	})
 
 	router.HandleFunc("POST /record/stop", func(w http.ResponseWriter, r *http.Request) {
+		obsClient, err := goobs.New("localhost:4455", goobs.WithPassword(password))
+		if err != nil {
+			slog.Error("failed to connect to obs", slog.Any("error", err))
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+
+		defer obsClient.Disconnect()
+
 		res, err := obsClient.Record.StopRecord()
 		if err != nil {
 			slog.Error("failed to stop recording", slog.Any("error", err))
@@ -163,7 +181,7 @@ func Start(ctx context.Context) error {
 	}
 
 	fmt.Println("Listening and serving")
-	err = srv.ListenAndServe()
+	err := srv.ListenAndServe()
 	if err != nil && !errors.Is(err, http.ErrServerClosed) {
 		logger.Error("failed to start server", slog.Any("error", err))
 		return fmt.Errorf("failed to listen and serve: %w", err)
@@ -197,7 +215,6 @@ func getNextPrefix(logger *slog.Logger) string {
 		}
 
 		match := matches[index]
-		fmt.Println("MATCH:", match)
 
 		num, err := strconv.Atoi(match)
 		if err != nil {
