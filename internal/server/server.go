@@ -191,7 +191,7 @@ func Start(ctx context.Context) error {
 }
 
 func getNextPrefix(logger *slog.Logger) string {
-	pattern := "/Users/elliott/Movies/Screencast/*.mov"
+	pattern := "/Users/elliott/Movies/Screencast/*.mkv"
 
 	files, err := filepath.Glob(pattern)
 	if err != nil {
@@ -199,7 +199,7 @@ func getNextPrefix(logger *slog.Logger) string {
 		return "000"
 	}
 
-	re, err := regexp.Compile(`.*/(?<num>[0-9]{3})-.*\.mov`)
+	re, err := regexp.Compile(`.*/(?<num>[0-9]{3})-.*\.mkv`)
 	if err != nil {
 		logger.Error("failed to compile regex", slog.Any("error", err))
 		return "000"
